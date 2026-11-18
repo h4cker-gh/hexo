@@ -1,0 +1,39 @@
+{
+  "name": "hexobot",
+  "version": "0.1.1",
+  "description": "Modular, multi-platform bot with structured commands and configurable architecture",
+  "main": "dist/app/index.js",
+  "types": "dist/app/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/app/main.ts",
+    "build": "tsup",
+    "start": "node dist/app/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:lint": "eslint src/",
+    "test:arch": "vitest run src/tests/architectural.test.ts",
+    "web:install": "npm --prefix web install",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.4.3",
+    "@fastify/static": "^10.1.11",
+    "@whiskeysockets/baileys": "^6.7.24",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0",
+    "zod": "^3.24.0"
+  }
+}
