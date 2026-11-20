@@ -1,6 +1,6 @@
 {
   "name": "hexobot",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Modular, multi-platform bot with structured commands and configurable architecture",
   "main": "dist/app/index.js",
   "types": "dist/app/index.d.ts",

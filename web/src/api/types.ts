@@ -21,7 +21,7 @@ export interface ContextMention {
   jid: string;
   /** Display name used in the normalized text, e.g. "clara". */
   name: string;
-  /** Digits only, when known. Used to rebuild @tokens when sending. */
+  /** Phone number digits, when known. Used to rebuild @tokens when sending. */
   phoneNumber?: string;
 }
 

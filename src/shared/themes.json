@@ -1,0 +1,110 @@
+{
+  "default": {
+    "wrap": 28,
+    "title": {
+      "top": "╭─",
+      "right": "─╮",
+      "center": "│   【 ",
+      "icon": "🩵 Hexo 💜",
+      "bottom": "】",
+      "afterTitle": "】"
+    },
+    "divider": "├─────═ ✧ ═─────┤",
+    "section": {
+      "prefix": "│",
+      "padding": " "
+    },
+    "footer": {
+      "top": "╰",
+      "bottom": "╯"
+    },
+    "color": {
+      "top": "#5B21B6",
+      "divider": "#7C3AED",
+      "content": "#E5E7EB",
+      "footer": "#5B21B6",
+      "accent": "#818CF8"
+    }
+  },
+  "minimal": {
+    "wrap": 40,
+    "title": {
+      "top": "┌",
+      "right": "┐",
+      "center": "",
+      "icon": "HexoBot",
+      "bottom": "",
+      "afterTitle": ""
+    },
+    "divider": "├",
+    "section": {
+      "prefix": "│",
+      "padding": " "
+    },
+    "footer": {
+      "top": "└",
+      "bottom": "┘"
+    },
+    "color": {
+      "top": "#374151",
+      "divider": "#4B5563",
+      "content": "#F9FAFB",
+      "footer": "#374151",
+      "accent": "#9CA3AF"
+    }
+  },
+  "retro": {
+    "wrap": 36,
+    "title": {
+      "top": "╔═",
+      "right": "═╗",
+      "center": "║  ",
+      "icon": " HEXOBOT ",
+      "bottom": "║",
+      "afterTitle": "║"
+    },
+    "divider": "╠══════════════════════╣",
+    "section": {
+      "prefix": "║",
+      "padding": " "
+    },
+    "footer": {
+      "top": "╚",
+      "bottom": "╝"
+    },
+    "color": {
+      "top": "#064E3B",
+      "divider": "#059669",
+      "content": "#ECFDF5",
+      "footer": "#064E3B",
+      "accent": "#34D399"
+    }
+  },
+  "neon": {
+    "wrap": 32,
+    "title": {
+      "top": "╭══",
+      "right": "══╮",
+      "center": "│  ⚡ ",
+      "icon": "HexoBot",
+      "bottom": "│",
+      "afterTitle": "⚡"
+    },
+    "divider": "├──────═⬤══════┤",
+    "section": {
+      "prefix": "│",
+      "padding": " "
+    },
+    "footer": {
+      "top": "╰══",
+      "bottom": "══╯"
+    },
+    "color": {
+      "top": "#7C3AED",
+      "divider": "#A855F7",
+      "content": "#F3E8FF",
+      "footer": "#7C3AED",
+      "accent": "#C084FC"
+    }
+  }
+}

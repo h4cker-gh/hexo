@@ -7,7 +7,7 @@ import type { CommandDefinition } from '@core/commands/types.js';
 
 /** Create a minimal context user for testing. */
 export function buildTestUser(overrides?: Partial<ContextUser>): ContextUser {
-  return { id: 'test-user-001', displayName: 'Test User', metadata: {}, ...overrides };
+  return { id: 'test-user-001', name: 'Test User', metadata: {}, ...overrides };
 }
 
 /** Create a minimal context channel for testing. */
