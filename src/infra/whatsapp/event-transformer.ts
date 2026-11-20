@@ -31,7 +31,7 @@ import {
 
 /** Options for event transformation. */
 export interface TransformOptions {
-  /** Bot's own JID (used to ignore own messages). */
+  /** Bot's own JID (used to identify own messages). */
   botJid: string;
   /** Builder to create UniversalContext. */
   contextBuilder: ContextBuilder;
@@ -47,8 +47,8 @@ export interface TransformOptions {
 
 /** Result of sender resolution for an incoming message. */
 export interface SenderResolution {
-  /** Canonical sender id (device suffix stripped). */
-  id: string;
+  /** Canonical sender JID (device suffix stripped). */
+  jid: string;
   /** Whether the message originated from the bot itself. */
   own: boolean;
 }
@@ -89,7 +89,7 @@ function sameJid(left: string, right: string): boolean {
  *
  * Group precedence: participantPn → participant → participantLid →
  * senderPn → senderLid. DM precedence: senderPn → senderLid → remoteJid.
- * Own messages use participant → senderLid → senderPn → bot JID.
+ * Own messages always return the bot's phone-based JID.
  */
 export function resolveSenderJid(
   key: WAMessageKey | undefined,
@@ -97,11 +97,8 @@ export function resolveSenderJid(
   isGroup: boolean,
   botJid: string,
 ): SenderResolution {
-  const ownCandidate = firstJid(key?.participant, key?.senderLid, key?.senderPn, botJid, remoteJid) ?? remoteJid;
-  const ownJid = normalizeJid(asUserJid(ownCandidate));
-
   if (key?.fromMe === true) {
-    return { id: ownJid, own: true };
+    return { jid: botJid, own: true };
   }
 
   const candidate = isGroup
@@ -110,17 +107,17 @@ export function resolveSenderJid(
   const resolved = normalizeJid(asUserJid(candidate ?? remoteJid));
 
   if (botJid && sameJid(resolved, botJid)) {
-    return { id: ownJid, own: true };
+    return { jid: botJid, own: true };
   }
 
-  return { id: resolved, own: false };
+  return { jid: resolved, own: false };
 }
 
 /**
  * Transforms Baileys events into UniversalContext and dispatches them.
  *
  * Handles messages (text, media captions, mentions), group metadata, and
- * connection state changes. Own messages are never dispatched.
+ * connection state changes. All messages are dispatched, including the bot's own.
  */
 export class EventTransformer {
   private readonly groupMetadataCache: Map<string, GroupMetadata>;
@@ -172,13 +169,6 @@ export class EventTransformer {
     const isGroup = isGroupJid(remoteJid);
     const sender = resolveSenderJid(message.key, remoteJid, isGroup, this.options.botJid);
 
-    if (sender.own) {
-      this.options.logger.debug('Own message', {
-        messageId: message.key?.id,
-        chatId: remoteJid,
-      });
-    }
-
     const text = this.extractMessageText(message);
     if (!text || text.trim().length === 0) {
       this.options.logger.debug('Non-text message, skipping', { messageId: message.key?.id });
@@ -196,12 +186,11 @@ export class EventTransformer {
 
     const participant = index ? this.lookupParticipant(index, sender.jid) : undefined;
     const senderPn = this.resolveSenderPn(sender.jid, message.key, participant);
-    const displayName = firstJid(message.pushName, participant?.name);
+    const name = firstJid(message.pushName, participant?.name);
 
     const user: ContextUser = {
       id: sender.jid,
-      displayName,
-      senderPN: senderPn,
+      name,
       metadata: {},
     };
 
@@ -226,11 +215,14 @@ export class EventTransformer {
       normalized.mentions,
     );
 
-    this.options.logger.debug('Transformed message to context', {
+    this.options.logger.info('Received message', {
       messageId: message.key?.id,
       chatId: channel.id,
+      chatType: channel.type,
       sender: user.id,
+      name: user.name,
       input,
+      parsedArgs,
     });
 
     await this.options.onContext(context);

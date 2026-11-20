@@ -31,6 +31,28 @@ import { EventTransformer } from './event-transformer.js';
 import { attachOutgoingMentions } from './message-normalizer.js';
 import { normalizeJid } from './types.js';
 
+/** Silences Baileys internal logging — only error/fatal pass through. */
+function makeBaileysQuietLogger(adapterLogger: Logger) {
+  return {
+    level: 'silent' as const,
+    trace: () => {},
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: (msg: unknown, ...data: unknown[]) => {
+      const msgStr = typeof msg === 'string' ? msg : (typeof msg === 'object' && msg !== null && 'message' in msg ? String((msg as { message: unknown }).message) : JSON.stringify(msg));
+      const ctx = data.length > 0 ? { baileys: data.map((d) => (typeof d === 'object' && d !== null ? JSON.stringify(d) : String(d))) } : undefined;
+      adapterLogger.error(`Baileys: ${msgStr}`, ctx);
+    },
+    fatal: (msg: unknown, ...data: unknown[]) => {
+      const msgStr = typeof msg === 'string' ? msg : (typeof msg === 'object' && msg !== null && 'message' in msg ? String((msg as { message: unknown }).message) : JSON.stringify(msg));
+      const ctx = data.length > 0 ? { baileys: data.map((d) => (typeof d === 'object' && d !== null ? JSON.stringify(d) : String(d))) } : undefined;
+      adapterLogger.fatal(`Baileys: ${msgStr}`, ctx);
+    },
+    child: () => makeBaileysQuietLogger(adapterLogger),
+  };
+}
+
 /** Configuration for the WhatsApp adapter. */
 export interface WhatsAppAdapterConfig {
   /** Directory for session data. */
@@ -45,6 +67,8 @@ export interface WhatsAppAdapterConfig {
   reconnectDelayMs: number;
   /** Print the QR code to the terminal (off by default; use the dashboard). */
   printQRInTerminal: boolean;
+  /** Phone number (E.164) for auto-pairing code instead of QR. */
+  pairingPhone: string;
   /** Logger instance. */
   logger: Logger;
 }
@@ -90,6 +114,7 @@ export class WhatsAppAdapter implements MessageAdapter, ConnectableAdapter {
 
   private readonly contextBuilder: ContextBuilder;
   private readonly onContext: (context: UniversalContext) => void | Promise<void>;
+  private onContextOverride: ((context: UniversalContext) => void | Promise<void>) | null = null;
 
   constructor(
     private readonly config: WhatsAppAdapterConfig,
@@ -99,6 +124,13 @@ export class WhatsAppAdapter implements MessageAdapter, ConnectableAdapter {
     this.contextBuilder = contextBuilder;
     this.onContext = onContext;
     this.snapshot = { status: 'disconnected', updatedAt: new Date().toISOString() };
+  }
+
+  /** Replace the onContext callback after construction. */
+  setOnContext(
+    onContext: (context: UniversalContext) => void | Promise<void>,
+  ): void {
+    this.onContextOverride = onContext;
   }
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────
@@ -135,7 +167,8 @@ export class WhatsAppAdapter implements MessageAdapter, ConnectableAdapter {
       contextBuilder: this.contextBuilder,
       logger,
       groupMetadataProvider: (groupId) => this.fetchGroupMetadata(groupId),
-      onContext: (context) => this.onContext(context),
+      onContext: (context) =>
+        (this.onContextOverride ?? this.onContext)(context),
     });
 
     if (this.sessionManager.isRegistered()) {
@@ -143,6 +176,14 @@ export class WhatsAppAdapter implements MessageAdapter, ConnectableAdapter {
         await this.connect('qr');
       } catch (error) {
         logger.error('Auto-connect failed', { error: getErrorMessage(error) });
+      }
+    } else if (this.config.pairingPhone) {
+      this.updateSnapshot({ status: 'pairing' });
+      try {
+        await this.connect('pairing-code', { phoneNumber: this.config.pairingPhone });
+      } catch (error) {
+        logger.error('Pairing code request failed', { error: getErrorMessage(error) });
+        this.updateSnapshot({ status: 'error', error: getErrorMessage(error) ?? 'Pairing failed' });
       }
     } else {
       this.updateSnapshot({ status: 'disconnected' });
@@ -377,10 +418,12 @@ export class WhatsAppAdapter implements MessageAdapter, ConnectableAdapter {
 
     try {
       const sent = await fn(socket);
-      return {
+      const result: MessageResult = {
         id: sent?.key?.id ?? crypto.randomUUID(),
         success: true,
       };
+      this.config.logger.info('Message sent successfully', { messageId: result.id });
+      return result;
     } catch (error) {
       const message = getErrorMessage(error) ?? 'Unknown error';
       this.config.logger.error('Failed to send message', { error: message });
@@ -421,6 +464,7 @@ export class WhatsAppAdapter implements MessageAdapter, ConnectableAdapter {
       markOnlineOnConnect: true,
       emitOwnEvents: false,
       syncFullHistory: false,
+      logger: makeBaileysQuietLogger(this.config.logger),
     });
 
     this.socket = socket;

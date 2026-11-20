@@ -12,6 +12,13 @@ import { isConnectableAdapter } from '@core/adapter/types.js';
 import type { MessageAdapter } from '@core/adapter/types.js';
 import { LogStore } from './monitor/log-store.js';
 import { Monitor } from './monitor/monitor.js';
+import { MemoryServiceImpl } from '@features/core/memory/index.js';
+import type { MemoryService } from '@features/core/memory/types.js';
+import { pingCommand } from '@features/core/commands/ping.js';
+import { helpCommand } from '@features/core/commands/help.js';
+import { profileCommand } from '@features/core/commands/profile.js';
+import { tagallCommand } from '@features/core/commands/tagall.js';
+import { chatinfoCommand } from '@features/core/commands/chatinfo.js';
 
 /** Service keys for dependency injection. */
 export const ServiceKeys = {
@@ -25,6 +32,7 @@ export const ServiceKeys = {
   MessageAdapter: 'messageAdapter' as const,
   LogStore: 'logStore' as const,
   Monitor: 'monitor' as const,
+  Memory: 'memory' as const,
 } as const;
 
 /** Map a validated config level to the runtime enum. */
@@ -87,6 +95,7 @@ export function bootstrapContainer(config: Config): DIContainer {
   container.register(ServiceKeys.FeatureRegistry, () => new FeatureRegistryImpl(), { singleton: true });
   container.register(ServiceKeys.LifecycleManager, () => new LifecycleManager(), { singleton: true });
   container.register(ServiceKeys.ContextBuilder, () => new DefaultContextBuilder(), { singleton: true });
+  container.register(ServiceKeys.Memory, () => new MemoryServiceImpl(), { singleton: true });
 
   // WhatsApp adapter
   container.register(
@@ -98,6 +107,8 @@ export function bootstrapContainer(config: Config): DIContainer {
       const contextBuilder = c.resolve<DefaultContextBuilder>(ServiceKeys.ContextBuilder);
       const adapterConfig = config.whatsapp;
 
+      const memory = c.resolve<MemoryService>(ServiceKeys.Memory);
+
       const adapter = new WhatsAppAdapter(
         {
           sessionDir: adapterConfig.sessionDir,
@@ -106,32 +117,51 @@ export function bootstrapContainer(config: Config): DIContainer {
           maxReconnectAttempts: adapterConfig.maxReconnectAttempts,
           reconnectDelayMs: adapterConfig.reconnectDelayMs,
           printQRInTerminal: adapterConfig.printQRInTerminal,
+          pairingPhone: adapterConfig.pairingPhone,
           logger,
         },
         contextBuilder,
-        async (context) => {
-          monitor.recordInbound('whatsapp', {
-            chatId: context.channel.id,
-            senderId: context.user.id,
-            senderName: context.user.displayName,
-            text: context.input,
-            success: true,
-          });
+        async () => {}, // placeholder — replaced via setOnContext
+      );
 
-          const command = context.parsedArgs[0]?.toLowerCase();
-          if (!command || !commandRegistry.has(command)) return;
+      adapter.setOnContext(async (context) => {
+        monitor.recordInbound('whatsapp', {
+          chatId: context.channel.id,
+          senderId: context.user.id,
+          senderName: context.user.name,
+          text: context.input,
+          success: true,
+        });
 
-          try {
-            await commandRegistry.execute(command, context, logger);
-            monitor.recordCommand('whatsapp');
-          } catch (error) {
-            monitor.recordError('whatsapp');
-            logger.error('Command dispatch failed', {
-              error: error instanceof Error ? error.message : String(error),
+        // Populate context.variables for command accessors.
+        context.variables.set('registry', {
+          getCommands: () => commandRegistry.list(),
+          getMetadata: (name: string) => commandRegistry.getMetadata(name),
+        });
+        context.variables.set('memory', memory);
+
+        const command = context.parsedArgs[0]?.toLowerCase();
+        if (!command || !commandRegistry.has(command)) return;
+
+        try {
+          const result = await commandRegistry.execute(command, context, logger);
+          monitor.recordCommand('whatsapp');
+
+          if (result.type === 'text' && result.content) {
+            await adapter.sendText({ to: context.channel.id, content: result.content });
+          } else if (result.type === 'error') {
+            await adapter.sendText({
+              to: context.channel.id,
+              content: `❌ ${result.message}`,
             });
           }
-        },
-      );
+        } catch (error) {
+          monitor.recordError('whatsapp');
+          logger.error('Command dispatch failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
 
       if (isConnectableAdapter(adapter)) {
         adapter.onConnectionChange((snapshot) => monitor.updateConnection('whatsapp', snapshot));
@@ -151,6 +181,13 @@ export function bootstrapContainer(config: Config): DIContainer {
     stage: LifecycleStage.Initializing,
     priority: 100,
     execute: async () => {
+      const commandRegistry = container.resolve<CommandRegistry>(ServiceKeys.CommandRegistry);
+      commandRegistry.register(pingCommand);
+      commandRegistry.register(helpCommand);
+      commandRegistry.register(profileCommand);
+      commandRegistry.register(tagallCommand);
+      commandRegistry.register(chatinfoCommand);
+
       if (!config.whatsapp.enabled) return;
       const adapter = container.resolve<MessageAdapter>(ServiceKeys.MessageAdapter);
       await adapter.init();

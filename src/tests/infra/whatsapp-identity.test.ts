@@ -77,7 +77,7 @@ describe('resolveSenderJid', () => {
     });
   });
 
-  it('uses own precedence for fromMe messages', () => {
+  it('uses the bot JID for fromMe messages', () => {
     const key: WAMessageKey = {
       remoteJid: GROUP_JID,
       fromMe: true,
@@ -87,7 +87,7 @@ describe('resolveSenderJid', () => {
     };
 
     expect(resolveSenderJid(key, GROUP_JID, true, BOT_JID)).toEqual({
-      jid: '111@lid',
+      jid: BOT_JID,
       own: true,
     });
   });
@@ -240,9 +240,8 @@ describe('EventTransformer identity', () => {
     expect(context.channel.type).toBe('group');
     expect(context.channel.name).toBe('Test group');
     expect(context.user.id).toBe('5511111111111@s.whatsapp.net');
-    expect(context.user.senderPN).toBe('5511111111111');
     expect(context.channel.participantPN).toBe('5511111111111');
-    expect(context.user.displayName).toBe('Clara Push');
+    expect(context.user.name).toBe('Clara Push');
     expect(context.input).toBe('hello @Clara');
     expect(context.mentions).toEqual([
       {
@@ -253,7 +252,7 @@ describe('EventTransformer identity', () => {
     ]);
   });
 
-  it('ignores own messages and logs at debug', async () => {
+  it('processes own messages and logs at info', async () => {
     const received: UniversalContext[] = [];
     const logger = buildTestLogger();
     const transformer = new EventTransformer({
@@ -277,8 +276,10 @@ describe('EventTransformer identity', () => {
 
     await transformer.handleMessages([message]);
 
-    expect(received).toHaveLength(0);
-    expect(logger.getAtLevel('debug').some((entry) => entry.message === 'Ignoring own message')).toBe(true);
+    // Bot always processes own messages (group echo, self-reminder, etc.)
+    expect(received).toHaveLength(1);
+    expect(received[0]?.user.id).toBe(BOT_JID);
+    expect(logger.getAtLevel('info').some((entry) => entry.message === 'Received message')).toBe(true);
   });
 
   it('keeps dispatching when group metadata lookup fails', async () => {

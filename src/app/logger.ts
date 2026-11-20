@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Logger, LoggerFactory, LogLevel } from '@core/logger/index.js';
 import { LogLevel as Lvl } from '@core/logger/index.js';
 import type { LogEntryDto, LogLevelName } from '@app/monitor/types.js';
+import { formatLogEntry } from '@shared/logger/formatter.js';
 
 /** Receives structured entries so the dashboard can stream logs. */
 export type LogSink = (entry: LogEntryDto) => void;
@@ -12,7 +13,7 @@ export interface ConsoleLoggerOptions {
   sink?: LogSink;
 }
 
-/** Console logger implementation. */
+/** Console logger implementation with colored, debug-mode output. */
 export class ConsoleLogger implements Logger {
   private readonly level: LogLevel;
   private readonly name: string;
@@ -30,9 +31,7 @@ export class ConsoleLogger implements Logger {
   }
 
   private format(level: LogLevel, message: string, context?: Record<string, unknown>): string {
-    const ts = new Date().toISOString();
-    const ctx = context ? ` ${JSON.stringify(context)}` : '';
-    return `[${ts}] ${level} [${this.name}] ${message}${ctx}`;
+    return formatLogEntry(level, message, context, this.name);
   }
 
   private emit(level: LogLevel, message: string, context?: Record<string, unknown>): void {
@@ -49,31 +48,36 @@ export class ConsoleLogger implements Logger {
 
   debug(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(Lvl.Debug)) return;
-    console.debug(this.format(Lvl.Debug, message, context));
+    const formatted = this.format(Lvl.Debug, message, context);
+    console.log(formatted);
     this.emit(Lvl.Debug, message, context);
   }
 
   info(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(Lvl.Info)) return;
-    console.info(this.format(Lvl.Info, message, context));
+    const formatted = this.format(Lvl.Info, message, context);
+    console.log(formatted);
     this.emit(Lvl.Info, message, context);
   }
 
   warn(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(Lvl.Warn)) return;
-    console.warn(this.format(Lvl.Warn, message, context));
+    const formatted = this.format(Lvl.Warn, message, context);
+    console.warn(formatted);
     this.emit(Lvl.Warn, message, context);
   }
 
   error(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(Lvl.Error)) return;
-    console.error(this.format(Lvl.Error, message, context));
+    const formatted = this.format(Lvl.Error, message, context);
+    console.error(formatted);
     this.emit(Lvl.Error, message, context);
   }
 
   fatal(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(Lvl.Fatal)) return;
-    console.error(this.format(Lvl.Fatal, message, context));
+    const formatted = this.format(Lvl.Fatal, message, context);
+    console.error(formatted);
     this.emit(Lvl.Fatal, message, context);
   }
 }

@@ -35,6 +35,7 @@ export const WhatsAppConfigSchema = z.object({
   enabled: z.boolean().default(true),
   phoneJid: z.string().default(''),
   phoneNumber: z.string().default(''),
+  pairingPhone: z.string().default('').describe('Phone number (E.164) for auto-pairing code instead of QR'),
   sessionDir: z.string().default('./session'),
   saveCreds: z.boolean().default(true),
   autoReconnect: z.boolean().default(true),
